@@ -1,0 +1,22 @@
+[
+  {"signal_id": "sig-BTC-001", "symbol": "BTC", "direction": "bullish", "confidence": 0.58, "horizon_hours": 24, "timestamp": "2026-03-20T12:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-BTC-002", "symbol": "BTC", "direction": "bullish", "confidence": 0.55, "horizon_hours": 24, "timestamp": "2026-03-20T16:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-BTC-003", "symbol": "BTC", "direction": "bearish", "confidence": 0.52, "horizon_hours": 24, "timestamp": "2026-03-21T08:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-BTC-004", "symbol": "BTC", "direction": "bullish", "confidence": 0.60, "horizon_hours": 24, "timestamp": "2026-03-21T16:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-BTC-005", "symbol": "BTC", "direction": "bearish", "confidence": 0.54, "horizon_hours": 24, "timestamp": "2026-03-22T08:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-ETH-001", "symbol": "ETH", "direction": "bullish", "confidence": 0.56, "horizon_hours": 24, "timestamp": "2026-03-20T12:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-ETH-002", "symbol": "ETH", "direction": "bearish", "confidence": 0.53, "horizon_hours": 24, "timestamp": "2026-03-20T16:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-ETH-003", "symbol": "ETH", "direction": "bullish", "confidence": 0.58, "horizon_hours": 24, "timestamp": "2026-03-21T08:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-ETH-004", "symbol": "ETH", "direction": "bearish", "confidence": 0.51, "horizon_hours": 24, "timestamp": "2026-03-21T16:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-ETH-005", "symbol": "ETH", "direction": "bullish", "confidence": 0.57, "horizon_hours": 24, "timestamp": "2026-03-22T08:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-SOL-001", "symbol": "SOL", "direction": "bearish", "confidence": 0.55, "horizon_hours": 24, "timestamp": "2026-03-20T12:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-SOL-002", "symbol": "SOL", "direction": "bearish", "confidence": 0.52, "horizon_hours": 24, "timestamp": "2026-03-20T16:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-SOL-003", "symbol": "SOL", "direction": "bullish", "confidence": 0.50, "horizon_hours": 24, "timestamp": "2026-03-21T08:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-SOL-004", "symbol": "SOL", "direction": "bearish", "confidence": 0.56, "horizon_hours": 24, "timestamp": "2026-03-21T16:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-SOL-005", "symbol": "SOL", "direction": "bearish", "confidence": 0.54, "horizon_hours": 24, "timestamp": "2026-03-22T08:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-LINK-001", "symbol": "LINK", "direction": "bullish", "confidence": 0.53, "horizon_hours": 24, "timestamp": "2026-03-20T12:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-LINK-002", "symbol": "LINK", "direction": "bearish", "confidence": 0.51, "horizon_hours": 24, "timestamp": "2026-03-20T16:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-LINK-003", "symbol": "LINK", "direction": "bullish", "confidence": 0.55, "horizon_hours": 24, "timestamp": "2026-03-21T08:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-LINK-004", "symbol": "LINK", "direction": "bearish", "confidence": 0.52, "horizon_hours": 24, "timestamp": "2026-03-21T16:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"},
+  {"signal_id": "sig-LINK-005", "symbol": "LINK", "direction": "bullish", "confidence": 0.54, "horizon_hours": 24, "timestamp": "2026-03-22T08:00:00+00:00", "regime": "SYSTEMIC", "method": "calibrated"}
+]

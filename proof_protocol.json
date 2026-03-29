@@ -1,0 +1,418 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://postfiat.org/schemas/proof-protocol/v1.0.0",
+  "title": "Post Fiat Continuous Proof Maintenance Protocol",
+  "description": "Defines how producers maintain a live, rolling proof surface with automated signal resolution, calibration drift detection, freshness guarantees, and atomic versioned updates. Fifth companion to pf-signal-schema, pf-routing-protocol, pf-resolution-protocol, and pf-aggregation-protocol.",
+
+  "$defs": {
+
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version string (major.minor.patch)."
+    },
+
+    "iso_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp with timezone."
+    },
+
+    "freshness_grade": {
+      "type": "string",
+      "enum": ["LIVE", "RECENT", "STALE", "EXPIRED"],
+      "description": "Proof surface freshness classification. LIVE: resolved within staleness_threshold. RECENT: within 2x threshold. STALE: within 4x threshold. EXPIRED: beyond 4x threshold."
+    },
+
+    "drift_status": {
+      "type": "string",
+      "enum": ["STABLE", "WATCH", "DRIFTING", "DEGRADED"],
+      "description": "Calibration drift status from CUSUM analysis. STABLE: no drift detected. WATCH: CUSUM approaching threshold. DRIFTING: CUSUM exceeded threshold. DEGRADED: sustained drift beyond recovery window."
+    },
+
+    "rolling_window": {
+      "type": "object",
+      "description": "Metrics computed over a rolling time window.",
+      "required": ["window_id", "window_days", "n_signals", "n_resolved", "accuracy", "brier_score"],
+      "properties": {
+        "window_id": {
+          "type": "string",
+          "enum": ["7d", "14d", "30d", "all_time"],
+          "description": "Window identifier."
+        },
+        "window_days": {
+          "type": "number",
+          "description": "Window length in days. 0 for all_time."
+        },
+        "start_date": {
+          "$ref": "#/$defs/iso_timestamp",
+          "description": "Window start timestamp."
+        },
+        "end_date": {
+          "$ref": "#/$defs/iso_timestamp",
+          "description": "Window end timestamp."
+        },
+        "n_signals": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total signals in window."
+        },
+        "n_resolved": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Resolved signals in window."
+        },
+        "resolution_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Fraction of signals resolved."
+        },
+        "accuracy": {
+          "type": "object",
+          "description": "Wilson score CI on directional accuracy.",
+          "required": ["point", "lower", "upper", "n"],
+          "properties": {
+            "point": { "type": "number" },
+            "lower": { "type": "number" },
+            "upper": { "type": "number" },
+            "n": { "type": "integer" }
+          }
+        },
+        "brier_score": {
+          "type": "number",
+          "description": "Mean Brier score in window. 0 = perfect, 0.25 = random."
+        },
+        "reliability": {
+          "type": "number",
+          "description": "Murphy-Winkler reliability (calibration error). Lower = better."
+        },
+        "resolution": {
+          "type": "number",
+          "description": "Murphy-Winkler resolution (discrimination). Higher = better."
+        },
+        "calibration_slope": {
+          "type": "number",
+          "description": "Linear regression slope of outcomes on forecasts. 1.0 = perfect calibration."
+        },
+        "per_symbol": {
+          "type": "object",
+          "description": "Per-symbol accuracy breakdown within window.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "accuracy": { "type": "number" },
+              "n": { "type": "integer" },
+              "brier_score": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+
+    "cusum_state": {
+      "type": "object",
+      "description": "CUSUM (Cumulative Sum) calibration drift detector state. Detects systematic shifts in accuracy away from a target rate.",
+      "required": ["cusum_pos", "cusum_neg", "drift_status", "target_accuracy", "allowance", "threshold"],
+      "properties": {
+        "cusum_pos": {
+          "type": "number",
+          "description": "Positive CUSUM statistic. Detects upward drift (improving accuracy). Reset to 0 when negative."
+        },
+        "cusum_neg": {
+          "type": "number",
+          "description": "Negative CUSUM statistic (stored as positive magnitude). Detects downward drift (degrading accuracy). Reset to 0 when negative."
+        },
+        "drift_status": {
+          "$ref": "#/$defs/drift_status"
+        },
+        "drift_detected_at": {
+          "oneOf": [{"$ref": "#/$defs/iso_timestamp"}, {"type": "null"}],
+          "description": "Timestamp when drift was first detected. Null if STABLE."
+        },
+        "drift_direction": {
+          "type": "string",
+          "enum": ["improving", "degrading", "none"],
+          "description": "Direction of detected drift."
+        },
+        "target_accuracy": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Target accuracy for CUSUM baseline. Typically the all-time historical accuracy."
+        },
+        "allowance": {
+          "type": "number",
+          "description": "CUSUM allowance (slack) parameter K. Shifts must exceed K per observation to accumulate. Default: half the detectable shift magnitude."
+        },
+        "threshold": {
+          "type": "number",
+          "description": "CUSUM decision threshold H. CUSUM exceeding H triggers drift detection. Higher H = fewer false alarms, slower detection."
+        },
+        "observations_since_reset": {
+          "type": "integer",
+          "description": "Number of observations processed since last CUSUM reset."
+        },
+        "run_length": {
+          "type": "integer",
+          "description": "Consecutive observations in current drift direction. 0 if STABLE."
+        }
+      }
+    },
+
+    "calibration_trajectory": {
+      "type": "object",
+      "description": "Time series of calibration metrics for trend analysis.",
+      "required": ["checkpoints"],
+      "properties": {
+        "checkpoints": {
+          "type": "array",
+          "description": "Ordered calibration snapshots at regular intervals.",
+          "items": {
+            "type": "object",
+            "required": ["timestamp", "n_cumulative", "accuracy", "brier_score"],
+            "properties": {
+              "timestamp": { "$ref": "#/$defs/iso_timestamp" },
+              "n_cumulative": { "type": "integer", "description": "Cumulative resolved signals at this checkpoint." },
+              "accuracy": { "type": "number" },
+              "brier_score": { "type": "number" },
+              "reliability": { "type": "number" },
+              "calibration_slope": { "type": "number" }
+            }
+          }
+        },
+        "trend": {
+          "type": ["object", "null"],
+          "description": "Linear trend fitted to checkpoint accuracy series. Null if fewer than 3 checkpoints.",
+          "properties": {
+            "slope_per_day": { "type": "number", "description": "Accuracy change per day. Positive = improving." },
+            "p_value": { "type": "number", "description": "Statistical significance of trend." },
+            "interpretation": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "freshness_metadata": {
+      "type": "object",
+      "description": "Proof surface freshness tracking.",
+      "required": ["last_resolved_at", "last_update_at", "staleness_threshold_hours", "freshness_grade", "signals_since_last_update"],
+      "properties": {
+        "last_resolved_at": {
+          "$ref": "#/$defs/iso_timestamp",
+          "description": "Timestamp of the most recently resolved signal."
+        },
+        "last_update_at": {
+          "$ref": "#/$defs/iso_timestamp",
+          "description": "Timestamp of the most recent proof surface update."
+        },
+        "staleness_threshold_hours": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum age in hours before proof surface is considered stale. Default: 24 hours."
+        },
+        "freshness_grade": {
+          "$ref": "#/$defs/freshness_grade"
+        },
+        "age_hours": {
+          "type": "number",
+          "description": "Current age of proof surface in hours since last_update_at."
+        },
+        "signals_since_last_update": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Signals pushed but not yet resolved since last proof update."
+        },
+        "next_update_due": {
+          "$ref": "#/$defs/iso_timestamp",
+          "description": "When the next proof update should occur based on staleness_threshold."
+        }
+      }
+    },
+
+    "snapshot_metadata": {
+      "type": "object",
+      "description": "Append-only versioned snapshot metadata for atomic proof updates.",
+      "required": ["snapshot_id", "snapshot_version", "created_at", "n_resolved_total"],
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "description": "Unique identifier for this snapshot (ISO timestamp or monotonic counter)."
+        },
+        "snapshot_version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonically increasing version number."
+        },
+        "created_at": {
+          "$ref": "#/$defs/iso_timestamp"
+        },
+        "parent_snapshot_id": {
+          "type": ["string", "null"],
+          "description": "ID of the previous snapshot this one extends. Null for the first snapshot."
+        },
+        "n_resolved_total": {
+          "type": "integer",
+          "description": "Total resolved signals in this snapshot (cumulative)."
+        },
+        "n_new_resolved": {
+          "type": "integer",
+          "description": "Signals newly resolved in this update cycle."
+        },
+        "n_unresolved_remaining": {
+          "type": "integer",
+          "description": "Signals still awaiting resolution."
+        }
+      }
+    },
+
+    "resolution_delta": {
+      "type": "object",
+      "description": "Incremental resolution results from a single maintenance cycle.",
+      "required": ["cycle_start", "cycle_end", "n_attempted", "n_resolved", "n_failed"],
+      "properties": {
+        "cycle_start": { "$ref": "#/$defs/iso_timestamp" },
+        "cycle_end": { "$ref": "#/$defs/iso_timestamp" },
+        "n_attempted": {
+          "type": "integer",
+          "description": "Signals attempted for resolution in this cycle."
+        },
+        "n_resolved": {
+          "type": "integer",
+          "description": "Signals successfully resolved (price data available)."
+        },
+        "n_failed": {
+          "type": "integer",
+          "description": "Signals that could not be resolved (missing price data)."
+        },
+        "n_skipped": {
+          "type": "integer",
+          "description": "Signals skipped (already resolved in previous cycle)."
+        },
+        "resolution_rate": {
+          "type": "number"
+        },
+        "accuracy_this_cycle": {
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "Accuracy of newly resolved signals only.",
+              "properties": {
+                "point": { "type": "number" },
+                "n": { "type": "integer" }
+              }
+            },
+            { "type": "null" }
+          ],
+          "description": "Accuracy of newly resolved signals only. Null when no signals resolved."
+        },
+        "price_data_source": {
+          "type": "string",
+          "description": "Source of price data for resolution (e.g. 'yahoo_finance', 'csv_fallback')."
+        }
+      }
+    },
+
+    "proof_report": {
+      "type": "object",
+      "description": "Complete proof maintenance report output.",
+      "required": ["meta", "freshness", "snapshot", "rolling_windows", "drift", "protocol_version"],
+      "properties": {
+        "meta": {
+          "type": "object",
+          "required": ["producer_id", "generated_at", "protocol_version", "signal_schema_version", "resolution_protocol_version"],
+          "properties": {
+            "producer_id": {
+              "type": "string",
+              "description": "Producer identifier."
+            },
+            "wallet": {
+              "type": "string",
+              "description": "Producer wallet address."
+            },
+            "generated_at": {
+              "$ref": "#/$defs/iso_timestamp"
+            },
+            "protocol_version": {
+              "$ref": "#/$defs/semver"
+            },
+            "signal_schema_version": {
+              "$ref": "#/$defs/semver"
+            },
+            "resolution_protocol_version": {
+              "$ref": "#/$defs/semver"
+            },
+            "proof_surface_version": {
+              "$ref": "#/$defs/semver"
+            }
+          }
+        },
+        "freshness": {
+          "$ref": "#/$defs/freshness_metadata"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/snapshot_metadata"
+        },
+        "resolution_delta": {
+          "$ref": "#/$defs/resolution_delta"
+        },
+        "rolling_windows": {
+          "type": "array",
+          "description": "Metrics computed over rolling time windows.",
+          "items": {
+            "$ref": "#/$defs/rolling_window"
+          },
+          "minItems": 1
+        },
+        "drift": {
+          "$ref": "#/$defs/cusum_state"
+        },
+        "calibration_trajectory": {
+          "$ref": "#/$defs/calibration_trajectory"
+        },
+        "reputation": {
+          "type": "object",
+          "description": "Current Producer Reputation Score computed from rolling metrics.",
+          "properties": {
+            "score": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "grade": {
+              "type": "string",
+              "enum": ["A", "B", "C", "D", "F"]
+            },
+            "previous_score": {
+              "type": ["number", "null"],
+              "description": "Score from previous snapshot for delta tracking. Null for first snapshot."
+            },
+            "score_delta": {
+              "type": ["number", "null"],
+              "description": "Change from previous snapshot. Positive = improving. Null for first snapshot."
+            }
+          }
+        },
+        "protocol_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "limitations": {
+          "type": "array",
+          "description": "Auto-detected limitations with bias direction and magnitude.",
+          "items": {
+            "type": "object",
+            "required": ["id", "description", "bias_direction", "bias_magnitude"],
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "bias_direction": { "type": "string" },
+              "bias_magnitude": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "$ref": "#/$defs/proof_report"
+}
