@@ -386,8 +386,28 @@ class PriceResolver:
             return None
         return float(close)
 
+    VALID_SYMBOLS = {"BTC", "ETH", "SOL", "LINK"}
+
     def resolve_signal(self, signal: Dict) -> Dict:
-        """Resolve a single signal against price data."""
+        """Resolve a single signal against price data.
+
+        Performs lightweight schema validation before resolution:
+        confidence must be in [0, 1], symbol must be a known ticker.
+        """
+        # Lightweight intake validation
+        confidence = signal.get("confidence")
+        if confidence is not None and (not isinstance(confidence, (int, float))
+                                       or confidence < 0.0 or confidence > 1.0):
+            return {**signal, "resolved": False,
+                    "resolution_reason": "schema_validation_failed",
+                    "validation_error": f"confidence={confidence} out of range [0.0, 1.0]"}
+
+        symbol = signal.get("symbol", "")
+        if symbol and symbol not in self.VALID_SYMBOLS:
+            return {**signal, "resolved": False,
+                    "resolution_reason": "schema_validation_failed",
+                    "validation_error": f"symbol='{symbol}' not in {sorted(self.VALID_SYMBOLS)}"}
+
         ts_str = signal.get("timestamp", "")
         try:
             signal_time = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
